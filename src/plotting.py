@@ -27,12 +27,12 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
 
     # Create pydot graph with hierarchical settings
     P = pydot.Dot(graph_type="digraph")
-    P.set_rankdir("TB")  # Top-to-bottom (ancestors at top)
-    P.set_splines("ortho")  # Orthogonal edges for cleaner tree look
-    P.set_nodesep("0.4")  # Horizontal spacing between nodes
-    P.set_ranksep("0.6")  # Vertical spacing between ranks
+    P.set("rankdir", "TB")  # Top-to-bottom (ancestors at top)
+    P.set("splines", "ortho")  # Orthogonal edges for cleaner tree look
+    P.set("nodesep", "0.4")  # Horizontal spacing between nodes
+    P.set("ranksep", "0.6")  # Vertical spacing between ranks
 
-    # Track spouse pairs for rank=same subgraphs
+    # Track spouse pairs with their family nodes for rank=same subgraphs
     spouse_pairs: list[tuple] = []
 
     # Add nodes
@@ -50,10 +50,10 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
                     label="",
                 )
             )
-            # Track spouse pairs for rank alignment
+            # Track spouse pairs with family node for rank alignment
             spouses = data.get("spouses", ())
             if len(spouses) == 2:
-                spouse_pairs.append(spouses)
+                spouse_pairs.append((spouses[0], spouses[1], node))
         else:
             # Person nodes
             sex = data.get("sex")
@@ -90,6 +90,7 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
                     str(v),
                     dir="none",
                     color="darkgray",
+                    # constraint="false",
                 )
             )
         elif edge_type == "family_to_child":
@@ -102,11 +103,17 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
                 )
             )
 
-    # Add rank=same subgraphs to align spouse pairs horizontally
-    for i, (a, b) in enumerate(spouse_pairs):
+    # Add rank=same subgraphs to align spouse pairs and family nodes horizontally
+    for i, (a, b, _) in enumerate(spouse_pairs):
         sg = pydot.Subgraph(f"cluster_couple_{i}", rank="same")
+        # sg.set("rankdir", "LR")
         sg.add_node(pydot.Node(str(a)))
+        # sg.add_node(pydot.Node(str(fam)))
         sg.add_node(pydot.Node(str(b)))
+        # Use invisible edges to force the left-to-right order B -> C -> A -> D
+        # The 'style="invis"' attribute makes the edges non-visible
+        # sg.add_edge(pydot.Edge(pydot.Node(str(a)), pydot.Node(str(fam)), style="invis"))
+        # sg.add_edge(pydot.Edge(pydot.Node(str(fam)), pydot.Node(str(b)), style="invis"))
         P.add_subgraph(sg)
 
     # Render
@@ -126,7 +133,7 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
         import matplotlib.pyplot as plt
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
-            P.write_png(f.name)
+            P.write(f.name, format="png")
             img = mpimg.imread(f.name)
             plt.figure(figsize=(20, 16))
             plt.imshow(img)
