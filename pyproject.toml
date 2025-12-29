@@ -1,0 +1,11 @@
+[project]
+name = "msgene"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ged4py>=0.5.2",
+    "matplotlib>=3.10.8",
+    "networkx>=3.6.1",
+]
