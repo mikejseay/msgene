@@ -1,2 +1,4 @@
-- Print validation warnings into a log file.
-- Write a new function `get_lineage_subgraph` to extract a sub-graph of a paternal lineage from a given ID. For any A paternal lineage is defined as the set of individuals 
+- In the function `build_graph`, in addition to storing the "name" field as the attribute `person_name`, let's store both the "given_name" and "surname" fields as new attributes `given_name` and `surname`.
+- Currently, family nodes are being plotted within their own "row" between generations. Instead, family nodes should be on the same rank as the parents, located directly between the two parents in a pair. This requires making changes to the function `plot_graph`.
+- Currently, rectangles are being drawn around parental pairs due to the creation of subgraphs. Make the rectangles for these subgraphs invisible.
+- Currently, each node in the graph used for plotting has a label based only on "person_name". Instead, extract four pieces of information and combine them to yield a label. Specifically, extract "given_name", "surname", "birth_date", and "death_date", and extract `birth_year` and `death_year` from the dates. String format them together as `f"{given_name}\n{surname}\n{birth_year}-{death_year}"`
