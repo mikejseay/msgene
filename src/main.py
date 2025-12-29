@@ -103,6 +103,14 @@ def parse_date_string(date_str: str | None) -> str | None:
     - "(04 05 1911)"
     - "(05/15/1923)"
     - "(06-06-1884)"
+    - "(1839-08-29)"
+    - "(SEPT. 17,1910)"
+    - "(JULY 7,1913)"
+    - "(Oct.12,1929)"
+    - "(May, 1837)"
+    - "(1789?)"
+    - "(About:1746-00-00)"
+    - "(around 1855)"
     - "(08 March 1893)"
     - "(1/15/1957)"
     - "(11 Aug. 1968)"
@@ -118,9 +126,11 @@ def parse_date_string(date_str: str | None) -> str | None:
     s = date_str.strip()
     # Remove parentheses
     s = s.strip("()")
-    # Remove qualifiers (ABT, ABOUT, BEF, AFT, EST, CAL, etc.)
+    # Remove trailing question marks
+    s = s.rstrip("?")
+    # Remove qualifiers (ABT, ABOUT, BEF, AFT, EST, CAL, AROUND, etc.) - with optional colon
     s = re.sub(
-        r"^(ABT\.?|ABOUT|BEF\.?|BEFORE|AFT\.?|AFTER|EST\.?|CAL\.?|FROM|TO|BET\.?|AND|CIRCA|CA\.?)\s*",
+        r"^(ABT\.?|ABOUT|BEF\.?|BEFORE|AFT\.?|AFTER|EST\.?|CAL\.?|FROM|TO|BET\.?|AND|CIRCA|CA\.?|AROUND):?\s*",
         "",
         s,
         flags=re.IGNORECASE,
@@ -134,6 +144,20 @@ def parse_date_string(date_str: str | None) -> str | None:
     month: int | None = None
     day: int | None = None
 
+    # Pattern 0: ISO format "1839-08-29" or "1746-00-00" (YYYY-MM-DD)
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", s)
+    if match:
+        year = int(match.group(1))
+        month = int(match.group(2))
+        day = int(match.group(3))
+        # Handle 00 month/day as defaults
+        if month == 0:
+            month = 1
+        if day == 0:
+            day = 1
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
     # Pattern 1: "25 NOV 1954" or "25 Nov 1954" (day month year)
     match = re.match(r"^(\d{1,2})\s+([A-Za-z]+)\.?\s*(\d{4})$", s)
     if match:
@@ -144,8 +168,8 @@ def parse_date_string(date_str: str | None) -> str | None:
         if month:
             return f"{year:04d}-{month:02d}-{day:02d}"
 
-    # Pattern 2: "NOV 1954" or "November 1954" (month year)
-    match = re.match(r"^([A-Za-z]+)\.?\s*(\d{4})$", s)
+    # Pattern 2: "NOV 1954" or "November 1954" or "May, 1837" (month year, optional comma)
+    match = re.match(r"^([A-Za-z]+)\.?,?\s*(\d{4})$", s)
     if match:
         month_str = match.group(1).upper().rstrip(".")
         month = MONTH_MAP.get(month_str)
@@ -197,8 +221,8 @@ def parse_date_string(date_str: str | None) -> str | None:
         if month:
             return f"{year:04d}-{month:02d}-{day:02d}"
 
-    # Pattern 8: "April 17, 1850" (Month DD, YYYY)
-    match = re.match(r"^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$", s)
+    # Pattern 8: "April 17, 1850" or "SEPT. 17,1910" or "Oct.12,1929" (Month DD, YYYY - various spacing)
+    match = re.match(r"^([A-Za-z]+)\.?\s*(\d{1,2}),?\s*(\d{4})$", s)
     if match:
         month_str = match.group(1).upper().rstrip(".")
         month = MONTH_MAP.get(month_str)
@@ -206,8 +230,6 @@ def parse_date_string(date_str: str | None) -> str | None:
         year = int(match.group(3))
         if month:
             return f"{year:04d}-{month:02d}-{day:02d}"
-
-    # Pattern 9: "April 1817" (Month YYYY) - already covered by Pattern 2
 
     return None
 

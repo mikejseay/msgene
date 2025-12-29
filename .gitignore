@@ -1,6 +1,8 @@
+*.sqbpro
+*.db
+
 # Genealogy / family tree
 *.ged
-*.db
 *.png
 
 # Python-generated files
