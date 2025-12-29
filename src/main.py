@@ -15,6 +15,7 @@ import re
 
 from ged4py import GedcomReader
 import networkx as nx
+from networkx.drawing.nx_pydot import graphviz_layout
 import matplotlib.pyplot as plt
 
 
@@ -499,10 +500,11 @@ def build_graph(conn: sqlite3.Connection) -> nx.DiGraph:
     cursor = conn.cursor()
 
     # Add nodes (persons)
+    # Note: use 'person_name' instead of 'name' to avoid conflict with pydot
     cursor.execute("SELECT id, name, sex, birth_date, death_date FROM person")
     for row in cursor.fetchall():
         G.add_node(
-            row[0], name=row[1], sex=row[2], birth_date=row[3], death_date=row[4]
+            row[0], person_name=row[1], sex=row[2], birth_date=row[3], death_date=row[4]
         )
 
     # Add edges (relationships)
@@ -561,8 +563,8 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
             # Check if child is born before parent (ISO dates can be string-compared)
             if child_birth < parent_birth:
                 warnings.append(
-                    f"Impossible: {child_data.get('name')} born before parent "
-                    f"{parent_data.get('name')}"
+                    f"Impossible: {child_data.get('person_name')} born before parent "
+                    f"{parent_data.get('person_name')}"
                 )
             else:
                 # Check if parent was too young (< 12 years old)
@@ -572,8 +574,8 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
                     child_year = int(child_birth[:4])
                     if child_year - parent_year < 12:
                         warnings.append(
-                            f"Suspicious: {parent_data.get('name')} was less than 12 years old "
-                            f"when {child_data.get('name')} was born"
+                            f"Suspicious: {parent_data.get('person_name')} was less than 12 years old "
+                            f"when {child_data.get('person_name')} was born"
                         )
                 except (ValueError, IndexError):
                     pass
@@ -584,7 +586,7 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
         death = data.get("death_date")
 
         if birth and death and death < birth:
-            warnings.append(f"Impossible: {data.get('name')} died before being born")
+            warnings.append(f"Impossible: {data.get('person_name')} died before being born")
 
     return warnings
 
@@ -619,20 +621,23 @@ def get_ego_subgraph(G: nx.DiGraph, center_id: int, radius: int = 2) -> nx.DiGra
 
 
 def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
-    """Plot the family tree graph using matplotlib."""
+    """
+    Plot the family tree using Graphviz hierarchical layout.
+    
+    Parents appear above children (ancestors at top), spouses aligned horizontally.
+    """
     plt.figure(figsize=(20, 16))
-
-    # Use a layout that works without optional dependencies
-    # For large graphs, use a simple layout; for smaller ones, try kamada_kawai
-    if G.number_of_nodes() > 500:
-        # For large graphs, use random layout (fast) or subsample
-        pos = nx.random_layout(G, seed=42)
-    else:
-        try:
-            pos = nx.kamada_kawai_layout(G)
-        except Exception:
-            pos = nx.random_layout(G, seed=42)
-
+    
+    # Use Graphviz 'dot' for hierarchical tree layout
+    # rankdir=TB = top-to-bottom (ancestors at top)
+    pos = graphviz_layout(G, prog="dot")
+    
+    # Separate edges by type for different styling
+    parent_edges = [(u, v) for u, v, d in G.edges(data=True) 
+                    if d.get("relationship_type") == "PARENT_OF"]
+    spouse_edges = [(u, v) for u, v, d in G.edges(data=True) 
+                    if d.get("relationship_type") == "SPOUSE_OF"]
+    
     # Color nodes by sex
     node_colors = []
     for node in G.nodes():
@@ -643,24 +648,58 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
             node_colors.append("lightpink")
         else:
             node_colors.append("lightgray")
-
-    # Draw the graph
-    nx.draw(
-        G,
-        pos,
+    
+    # Create node labels (first name)
+    labels = {}
+    for node in G.nodes():
+        name = G.nodes[node].get("person_name", "?")
+        parts = name.split()
+        labels[node] = parts[0][:10] if parts else "?"
+    
+    # Draw nodes
+    nx.draw_networkx_nodes(
+        G, pos,
         node_color=node_colors,
-        node_size=50,
-        font_size=4,
-        with_labels=False,
+        node_size=800,
+        alpha=0.9,
+    )
+    
+    # Draw node labels
+    nx.draw_networkx_labels(
+        G, pos,
+        labels=labels,
+        font_size=8,
+        font_weight="bold",
+    )
+    
+    # Draw parent-child edges (solid arrows pointing down to children)
+    nx.draw_networkx_edges(
+        G, pos,
+        edgelist=parent_edges,
+        edge_color="darkgray",
         arrows=True,
-        edge_color="gray",
-        alpha=0.7,
-        width=0.3,
+        arrowsize=15,
+        width=1.5,
+        alpha=0.8,
     )
-
+    
+    # Draw spouse edges (dashed red lines, no arrows)
+    nx.draw_networkx_edges(
+        G, pos,
+        edgelist=spouse_edges,
+        edge_color="red",
+        style="dashed",
+        arrows=False,
+        width=1.5,
+        alpha=0.6,
+    )
+    
     plt.title(
-        f"Family Tree Graph ({G.number_of_nodes()} people, {G.number_of_edges()} relationships)"
+        f"Family Tree ({G.number_of_nodes()} people, {G.number_of_edges()} relationships)",
+        fontsize=14,
+        fontweight="bold",
     )
+    plt.axis("off")
     plt.tight_layout()
 
     if output_path:
