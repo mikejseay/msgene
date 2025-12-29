@@ -13,9 +13,17 @@ def build_graph(conn: sqlite3.Connection) -> nx.DiGraph:
 
     # Add nodes (persons)
     # Note: use 'person_name' instead of 'name' to avoid conflict with pydot
-    cursor.execute("SELECT id, name, sex, birth_date, death_date FROM person")
+    cursor.execute("SELECT id, name, sex, birth_date, death_date, given_name, surname FROM person")
     for row in cursor.fetchall():
-        G.add_node(row[0], person_name=row[1], sex=row[2], birth_date=row[3], death_date=row[4])
+        G.add_node(
+            row[0],
+            person_name=row[1],
+            sex=row[2],
+            birth_date=row[3],
+            death_date=row[4],
+            given_name=row[5],
+            surname=row[6],
+        )
 
     # Add edges (relationships)
     cursor.execute("SELECT person1_id, person2_id, relationship_type FROM relationship")
