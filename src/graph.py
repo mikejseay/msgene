@@ -174,7 +174,8 @@ def build_union_layout_graph(G: nx.DiGraph) -> nx.DiGraph:
 
     # For each child, connect them to the appropriate family node
     for child, parents in parents_by_child.items():
-        parents = list(dict.fromkeys(parents))  # unique, preserve order
+        # De-duplicate parents while preserving order
+        parents = list(dict.fromkeys(parents))
 
         fam_id = None
 
