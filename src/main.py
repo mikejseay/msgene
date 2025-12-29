@@ -13,7 +13,7 @@ Family tree application entry point.
 from pathlib import Path
 
 from database import create_database, store_data
-from graph import build_graph, get_ego_subgraph
+from graph import build_graph, get_ego_subgraph, get_lineage_subgraph
 from parsing import normalize_data, parse_gedcom
 from plotting import plot_graph
 from validation import validate_graph
@@ -66,10 +66,13 @@ def main():
     else:
         print("  No validation issues found")
 
-    # Subset graph to nodes within degree 2 of a focal individual
-    focal_person_id = 347421849
-    print(f"Extracting subgraph within degree 2 of person {focal_person_id}...")
+    # Subset graph to nodes within degree 2 of a focal individual. Examples:
+    # William R. Seay, Jr. = 347421849
+    # Michael James Seay = 347421845
+    focal_person_id = 347421845
+    # print(f"Extracting subgraph within degree 2 of person {focal_person_id}...")
     subgraph = get_ego_subgraph(G, focal_person_id, radius=2)
+    # subgraph = get_lineage_subgraph(G, focal_person_id, sex="M", radius=0)
     print(
         f"  Subgraph has {subgraph.number_of_nodes()} nodes and {subgraph.number_of_edges()} edges"
     )

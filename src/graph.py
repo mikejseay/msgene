@@ -15,9 +15,7 @@ def build_graph(conn: sqlite3.Connection) -> nx.DiGraph:
     # Note: use 'person_name' instead of 'name' to avoid conflict with pydot
     cursor.execute("SELECT id, name, sex, birth_date, death_date FROM person")
     for row in cursor.fetchall():
-        G.add_node(
-            row[0], person_name=row[1], sex=row[2], birth_date=row[3], death_date=row[4]
-        )
+        G.add_node(row[0], person_name=row[1], sex=row[2], birth_date=row[3], death_date=row[4])
 
     # Add edges (relationships)
     cursor.execute("SELECT person1_id, person2_id, relationship_type FROM relationship")
@@ -49,6 +47,71 @@ def get_ego_subgraph(G: nx.DiGraph, center_id: int, radius: int = 2) -> nx.DiGra
 
     # Return the directed subgraph induced by these nodes
     return G.subgraph(ego.nodes()).copy()
+
+
+def get_lineage_subgraph(
+    G: nx.DiGraph, center_id: int, sex: str = "M", radius: int = 1
+) -> nx.DiGraph:
+    """
+    Extract a subgraph representing the "lineage" of center_id of a particular sex - the union of
+    ego subgraphs of a given radius for a chain of parents of a given sex.
+    Begin with center_id. Add its ego subgraph of the given radius to the set.
+    Next, find the node's parent (PARENT_OF) of the given sex. Add its ego subgraph to the set.
+    Continue recursively by finding the next parent of the given sex and adding its ego subgraph.
+    Return the subgraph of G containing the union of nodes from all ego subgraphs found this way.
+    In the special case that radius = 0, ego subgraphs should only contain a node's spouse.
+
+    Args:
+        G: The full graph
+        center_id: The person ID to center the subgraph on
+        sex: The sex of parents to recursively iterate through
+        radius: Maximum distance from center (default 1)
+
+    Returns:
+        A subgraph containing nodes within `radius` edges of the parental lineage `center_id` of
+        a given sex.
+    """
+    if center_id not in G:
+        raise ValueError(f"Person ID {center_id} not found in graph")
+
+    # Use undirected view for ego graph extraction
+    undirected = G.to_undirected()
+
+    # Collect all nodes from ego subgraphs along the lineage
+    all_nodes: set[int] = set()
+
+    current_id = center_id
+    while current_id is not None:
+        # Add ego subgraph nodes for current person
+        # In the special case that radius = 0, ego subgraphs should only contain a node's spouse.
+        if radius == 0:
+            # Add current person and their spouse(s)
+            all_nodes.add(current_id)
+            for neighbor in G.predecessors(current_id):
+                if G.edges[neighbor, current_id].get("relationship_type") == "SPOUSE_OF":
+                    all_nodes.add(neighbor)
+            for neighbor in G.successors(current_id):
+                if G.edges[current_id, neighbor].get("relationship_type") == "SPOUSE_OF":
+                    all_nodes.add(neighbor)
+        else:
+            ego = nx.ego_graph(undirected, current_id, radius=radius)
+            all_nodes.update(ego.nodes())
+
+        # Find parent of the given sex
+        # PARENT_OF edges go from parent → child, so parents are predecessors
+        next_parent = None
+        for parent in G.predecessors(current_id):
+            edge_data = G.edges[parent, current_id]
+            if edge_data.get("relationship_type") == "PARENT_OF":
+                parent_data = G.nodes[parent]
+                if parent_data.get("sex") == sex:
+                    next_parent = parent
+                    break
+
+        current_id = next_parent
+
+    # Return the directed subgraph induced by these nodes
+    return G.subgraph(all_nodes).copy()
 
 
 def build_union_layout_graph(G: nx.DiGraph) -> nx.DiGraph:
