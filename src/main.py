@@ -491,6 +491,11 @@ def main():
     db_path = project_root / "family_tree.db"
     plot_path = project_root / "family_tree.png"
 
+    # Delete existing database to ensure fresh start
+    if db_path.exists():
+        db_path.unlink()
+        print(f"Deleted existing database: {db_path}")
+
     print(f"Parsing GEDCOM file: {gedcom_path}")
     reader = parse_gedcom(gedcom_path)
 
