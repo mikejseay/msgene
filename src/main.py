@@ -11,7 +11,6 @@
 from pathlib import Path
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
 import re
 
 from ged4py import GedcomReader
@@ -31,9 +30,11 @@ class Person:
     given_name: str | None
     surname: str | None
     sex: str | None
-    birth_date: str | None
+    birth_date_string: str | None
+    birth_date: str | None  # ISO format YYYY-MM-DD or None
     birth_place: str | None
-    death_date: str | None
+    death_date_string: str | None
+    death_date: str | None  # ISO format YYYY-MM-DD or None
     death_place: str | None
 
 
@@ -56,6 +57,159 @@ def extract_numeric_id(xref_id: str) -> int:
     if not digits:
         raise ValueError(f"No numeric ID found in: {xref_id}")
     return int(digits)
+
+
+# Month name mappings (handle abbreviations and full names)
+MONTH_MAP = {
+    "JAN": 1,
+    "JANUARY": 1,
+    "FEB": 2,
+    "FEBRUARY": 2,
+    "MAR": 3,
+    "MARCH": 3,
+    "APR": 4,
+    "APRIL": 4,
+    "MAY": 5,
+    "JUN": 6,
+    "JUNE": 6,
+    "JUL": 7,
+    "JULY": 7,
+    "AUG": 8,
+    "AUGUST": 8,
+    "SEP": 9,
+    "SEPT": 9,
+    "SEPTEMBER": 9,
+    "OCT": 10,
+    "OCTOBER": 10,
+    "NOV": 11,
+    "NOVEMBER": 11,
+    "DEC": 12,
+    "DECEMBER": 12,
+}
+
+
+def parse_date_string(date_str: str | None) -> str | None:
+    """
+    Parse a GEDCOM date string into ISO format (YYYY-MM-DD).
+    Returns None if the date cannot be parsed.
+
+    Handles formats like:
+    - "25 NOV 1954"
+    - "1698"
+    - "ABOUT 1905"
+    - "JAN 1905"
+    - "(01-27-1920)"
+    - "(02 May1838)"
+    - "(04 05 1911)"
+    - "(05/15/1923)"
+    - "(06-06-1884)"
+    - "(08 March 1893)"
+    - "(1/15/1957)"
+    - "(11 Aug. 1968)"
+    - "(Abt.  1798)"
+    - "(April 1817)"
+    - "(April 17, 1850)"
+    - "(about 1833)"
+    """
+    if not date_str:
+        return None
+
+    # Clean up the string
+    s = date_str.strip()
+    # Remove parentheses
+    s = s.strip("()")
+    # Remove qualifiers (ABT, ABOUT, BEF, AFT, EST, CAL, etc.)
+    s = re.sub(
+        r"^(ABT\.?|ABOUT|BEF\.?|BEFORE|AFT\.?|AFTER|EST\.?|CAL\.?|FROM|TO|BET\.?|AND|CIRCA|CA\.?)\s*",
+        "",
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = s.strip()
+
+    if not s:
+        return None
+
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
+
+    # Pattern 1: "25 NOV 1954" or "25 Nov 1954" (day month year)
+    match = re.match(r"^(\d{1,2})\s+([A-Za-z]+)\.?\s*(\d{4})$", s)
+    if match:
+        day = int(match.group(1))
+        month_str = match.group(2).upper().rstrip(".")
+        month = MONTH_MAP.get(month_str)
+        year = int(match.group(3))
+        if month:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Pattern 2: "NOV 1954" or "November 1954" (month year)
+    match = re.match(r"^([A-Za-z]+)\.?\s*(\d{4})$", s)
+    if match:
+        month_str = match.group(1).upper().rstrip(".")
+        month = MONTH_MAP.get(month_str)
+        year = int(match.group(2))
+        if month:
+            return f"{year:04d}-{month:02d}-01"
+
+    # Pattern 3: "1698" (year only)
+    match = re.match(r"^(\d{4})$", s)
+    if match:
+        year = int(match.group(1))
+        return f"{year:04d}-01-01"
+
+    # Pattern 4: "01-27-1920" or "01/27/1920" (MM-DD-YYYY or MM/DD/YYYY)
+    match = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", s)
+    if match:
+        month = int(match.group(1))
+        day = int(match.group(2))
+        year = int(match.group(3))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Pattern 5: "04 05 1911" (MM DD YYYY with spaces)
+    match = re.match(r"^(\d{1,2})\s+(\d{1,2})\s+(\d{4})$", s)
+    if match:
+        month = int(match.group(1))
+        day = int(match.group(2))
+        year = int(match.group(3))
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Pattern 6: "02 May1838" (DD MonthYYYY - no space between month and year)
+    match = re.match(r"^(\d{1,2})\s+([A-Za-z]+)(\d{4})$", s)
+    if match:
+        day = int(match.group(1))
+        month_str = match.group(2).upper().rstrip(".")
+        month = MONTH_MAP.get(month_str)
+        year = int(match.group(3))
+        if month:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Pattern 7: "08 March 1893" or "11 Aug. 1968" (DD Month YYYY)
+    match = re.match(r"^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})$", s)
+    if match:
+        day = int(match.group(1))
+        month_str = match.group(2).upper().rstrip(".")
+        month = MONTH_MAP.get(month_str)
+        year = int(match.group(3))
+        if month:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Pattern 8: "April 17, 1850" (Month DD, YYYY)
+    match = re.match(r"^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$", s)
+    if match:
+        month_str = match.group(1).upper().rstrip(".")
+        month = MONTH_MAP.get(month_str)
+        day = int(match.group(2))
+        year = int(match.group(3))
+        if month:
+            return f"{year:04d}-{month:02d}-{day:02d}"
+
+    # Pattern 9: "April 1817" (Month YYYY) - already covered by Pattern 2
+
+    return None
 
 
 def parse_gedcom(filepath: Path) -> GedcomReader:
@@ -143,8 +297,12 @@ def normalize_data(reader: GedcomReader) -> tuple[list[Person], list[Relationshi
         indi_id = extract_numeric_id(rec.xref_id)
         full_name, given_name, surname = extract_name_parts(rec)
         sex = extract_sex(rec)
-        birth_date, birth_place = extract_event_details(rec, "BIRT")
-        death_date, death_place = extract_event_details(rec, "DEAT")
+        birth_date_string, birth_place = extract_event_details(rec, "BIRT")
+        death_date_string, death_place = extract_event_details(rec, "DEAT")
+
+        # Parse date strings into ISO format
+        birth_date = parse_date_string(birth_date_string)
+        death_date = parse_date_string(death_date_string)
 
         persons.append(
             Person(
@@ -153,8 +311,10 @@ def normalize_data(reader: GedcomReader) -> tuple[list[Person], list[Relationshi
                 given_name=given_name,
                 surname=surname,
                 sex=sex,
+                birth_date_string=birth_date_string,
                 birth_date=birth_date,
                 birth_place=birth_place,
+                death_date_string=death_date_string,
                 death_date=death_date,
                 death_place=death_place,
             )
@@ -239,8 +399,10 @@ def create_database(db_path: Path) -> sqlite3.Connection:
             given_name TEXT,
             surname TEXT,
             sex TEXT,
+            birth_date_string TEXT,
             birth_date TEXT,
             birth_place TEXT,
+            death_date_string TEXT,
             death_date TEXT,
             death_place TEXT
         )
@@ -271,8 +433,8 @@ def store_data(
     cursor.executemany(
         """
         INSERT OR REPLACE INTO person 
-        (id, name, given_name, surname, sex, birth_date, birth_place, death_date, death_place)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, name, given_name, surname, sex, birth_date_string, birth_date, birth_place, death_date_string, death_date, death_place)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -281,8 +443,10 @@ def store_data(
                 p.given_name,
                 p.surname,
                 p.sex,
+                p.birth_date_string,
                 p.birth_date,
                 p.birth_place,
+                p.death_date_string,
                 p.death_date,
                 p.death_place,
             )
@@ -332,33 +496,6 @@ def build_graph(conn: sqlite3.Connection) -> nx.DiGraph:
 # ============================================================================
 
 
-def parse_gedcom_date(date_str: str | None) -> datetime | None:
-    """Attempt to parse a GEDCOM date string into a datetime object."""
-    if not date_str:
-        return None
-
-    # Common GEDCOM date formats
-    patterns = [
-        (r"(\d{1,2}) (\w{3}) (\d{4})", "%d %b %Y"),  # 25 NOV 1954
-        (r"(\w{3}) (\d{4})", "%b %Y"),  # NOV 1954
-        (r"(\d{4})", "%Y"),  # 1954
-    ]
-
-    date_str = date_str.upper().strip()
-    # Remove qualifiers like ABT, BEF, AFT, etc.
-    date_str = re.sub(r"^(ABT|BEF|AFT|EST|CAL|FROM|TO|BET|AND)\s*", "", date_str)
-
-    for pattern, fmt in patterns:
-        match = re.match(pattern, date_str)
-        if match:
-            try:
-                return datetime.strptime(match.group(0), fmt)
-            except ValueError:
-                continue
-
-    return None
-
-
 def validate_graph(G: nx.DiGraph) -> list[str]:
     """
     Validate the family tree graph for:
@@ -387,6 +524,7 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
         pass  # No cycle found, which is good
 
     # Check for impossible ages (child born before parent)
+    # birth_date is now ISO format (YYYY-MM-DD) which can be compared as strings
     for parent, child, data in G.edges(data=True):
         if data.get("relationship_type") != "PARENT_OF":
             continue
@@ -394,27 +532,34 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
         parent_data = G.nodes[parent]
         child_data = G.nodes[child]
 
-        parent_birth = parse_gedcom_date(parent_data.get("birth_date"))
-        child_birth = parse_gedcom_date(child_data.get("birth_date"))
+        parent_birth = parent_data.get("birth_date")
+        child_birth = child_data.get("birth_date")
 
         if parent_birth and child_birth:
-            # Check if child is born before parent
+            # Check if child is born before parent (ISO dates can be string-compared)
             if child_birth < parent_birth:
                 warnings.append(
                     f"Impossible: {child_data.get('name')} born before parent "
                     f"{parent_data.get('name')}"
                 )
-            # Check if parent was too young (< 12 years old)
-            elif (child_birth - parent_birth).days < 12 * 365:
-                warnings.append(
-                    f"Suspicious: {parent_data.get('name')} was less than 12 years old "
-                    f"when {child_data.get('name')} was born"
-                )
+            else:
+                # Check if parent was too young (< 12 years old)
+                # Parse years from ISO format
+                try:
+                    parent_year = int(parent_birth[:4])
+                    child_year = int(child_birth[:4])
+                    if child_year - parent_year < 12:
+                        warnings.append(
+                            f"Suspicious: {parent_data.get('name')} was less than 12 years old "
+                            f"when {child_data.get('name')} was born"
+                        )
+                except (ValueError, IndexError):
+                    pass
 
     # Check death before birth
     for node, data in G.nodes(data=True):
-        birth = parse_gedcom_date(data.get("birth_date"))
-        death = parse_gedcom_date(data.get("death_date"))
+        birth = data.get("birth_date")
+        death = data.get("death_date")
 
         if birth and death and death < birth:
             warnings.append(f"Impossible: {data.get('name')} died before being born")
