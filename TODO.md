@@ -1,2 +1,1 @@
 - The current approach has a `main.py` that's at about 500 lines. Let's break up the functions into modules in an intelligent way and import them into the main script.
-- Before plotting the family tree, sub-set the graph to the set of nodes and edges that are within a degree of 2 from a given invidual. By default, this individual should be id 347421849.

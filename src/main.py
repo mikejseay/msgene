@@ -594,6 +594,30 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
 # ============================================================================
 
 
+def get_ego_subgraph(G: nx.DiGraph, center_id: int, radius: int = 2) -> nx.DiGraph:
+    """
+    Extract a subgraph containing nodes within a given degree of a center node.
+
+    Args:
+        G: The full graph
+        center_id: The person ID to center the subgraph on
+        radius: Maximum distance from center (default 2)
+
+    Returns:
+        A subgraph containing only nodes within `radius` edges of `center_id`
+    """
+    if center_id not in G:
+        raise ValueError(f"Person ID {center_id} not found in graph")
+
+    # Use undirected view for ego graph to capture both directions
+    # (parents, children, spouses all within radius)
+    undirected = G.to_undirected()
+    ego = nx.ego_graph(undirected, center_id, radius=radius)
+
+    # Return the directed subgraph induced by these nodes
+    return G.subgraph(ego.nodes()).copy()
+
+
 def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
     """Plot the family tree graph using matplotlib."""
     plt.figure(figsize=(20, 16))
@@ -689,8 +713,16 @@ def main():
     else:
         print("  No validation issues found")
 
+    # Subset graph to nodes within degree 2 of a focal individual
+    focal_person_id = 347421849
+    print(f"Extracting subgraph within degree 2 of person {focal_person_id}...")
+    subgraph = get_ego_subgraph(G, focal_person_id, radius=2)
+    print(
+        f"  Subgraph has {subgraph.number_of_nodes()} nodes and {subgraph.number_of_edges()} edges"
+    )
+
     print(f"Plotting graph to: {plot_path}")
-    plot_graph(G, plot_path)
+    plot_graph(subgraph, plot_path)
 
     conn.close()
     print("Done!")
