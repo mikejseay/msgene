@@ -16,9 +16,7 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
 
     # Create a subgraph with only PARENT_OF edges for cycle detection
     parent_edges = [
-        (u, v)
-        for u, v, d in G.edges(data=True)
-        if d.get("relationship_type") == "PARENT_OF"
+        (u, v) for u, v, d in G.edges(data=True) if d.get("relationship_type") == "PARENT_OF"
     ]
     parent_graph = nx.DiGraph(parent_edges)
 
@@ -69,8 +67,6 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
         death = data.get("death_date")
 
         if birth and death and death < birth:
-            warnings.append(
-                f"Impossible: {data.get('person_name')} died before being born"
-            )
+            warnings.append(f"Impossible: {data.get('person_name')} died before being born")
 
     return warnings

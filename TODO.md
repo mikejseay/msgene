@@ -1,2 +1,2 @@
 - Print validation warnings into a log file.
-- Extract sub-graph of a paternal lineage from a given ID.
+- Write a new function `get_lineage_subgraph` to extract a sub-graph of a paternal lineage from a given ID. For any A paternal lineage is defined as the set of individuals 

@@ -42,9 +42,7 @@ def create_database(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
-def store_data(
-    conn: sqlite3.Connection, persons: list[Person], relationships: list[Relationship]
-):
+def store_data(conn: sqlite3.Connection, persons: list[Person], relationships: list[Relationship]):
     """Insert persons and relationships into the database."""
     cursor = conn.cursor()
 

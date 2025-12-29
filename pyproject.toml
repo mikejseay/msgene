@@ -12,3 +12,43 @@ dependencies = [
     "networkx>=3.6.1",
     "pydot>=4.0.1",
 ]
+
+[tool.ruff]
+# Set the maximum line length to 100.
+line-length = 100
+# Match your runtime so Ruff/pyupgrade can suggest modern syntax.
+target-version = "py312"
+
+[tool.ruff.lint]
+# A solid "feel like PyCharm" ruleset.
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "W",   # pycodestyle warnings
+  "I",   # import sorting (isort)
+  "B",   # bugbear (bug-prone patterns)
+  "UP",  # pyupgrade (modernize syntax)
+  "SIM", # simplify (code simplifications)
+]
+
+# If you *like* explicit long-line diagnostics in addition
+# to Ruff’s formatter wrapping, keep this. If you find it noisy,
+# you can delete this block.
+extend-select = ["E501"]
+
+[tool.ruff.lint.isort]
+# Make import sorting deterministic and Black-friendly.
+force-sort-within-sections = true
+combine-as-imports = true
+# Optionally tell Ruff what’s "first-party" so it groups imports nicely:
+# known-first-party = ["your_package_name"]
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings (the default).
+quote-style = "double"
+# Like Black, indent with spaces, rather than tabs (the default).
+indent-style = "space"
+# Like Black, respect magic trailing commas (the default).
+skip-magic-trailing-comma = false
+# Like Black, automatically detect the appropriate line ending (the default).
+line-ending = "auto"
