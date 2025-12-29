@@ -1,1 +1,2 @@
-This will contain TODO items for future tasks.
+- Print validation warnings into a log file.
+- Extract sub-graph of a paternal lineage from a given ID.

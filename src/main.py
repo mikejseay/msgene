@@ -54,6 +54,15 @@ def main():
             print(f"    - {w}")
         if len(warnings) > 10:
             print(f"    ... and {len(warnings) - 10} more")
+
+        # Write all warnings to log file
+        log_path = project_root / "validation_warnings.log"
+        with open(log_path, "w") as f:
+            f.write(f"Validation Warnings ({len(warnings)} total)\n")
+            f.write("=" * 50 + "\n\n")
+            for w in warnings:
+                f.write(f"- {w}\n")
+        print(f"  Full warnings written to: {log_path}")
     else:
         print("  No validation issues found")
 
