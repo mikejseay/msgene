@@ -90,7 +90,6 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
                     str(v),
                     dir="none",
                     color="darkgray",
-                    # constraint="false",
                 )
             )
         elif edge_type == "family_to_child":
@@ -106,14 +105,8 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
     # Add rank=same subgraphs to align spouse pairs and family nodes horizontally
     for i, (a, b, _) in enumerate(spouse_pairs):
         sg = pydot.Subgraph(f"cluster_couple_{i}", rank="same")
-        # sg.set("rankdir", "LR")
         sg.add_node(pydot.Node(str(a)))
-        # sg.add_node(pydot.Node(str(fam)))
         sg.add_node(pydot.Node(str(b)))
-        # Use invisible edges to force the left-to-right order B -> C -> A -> D
-        # The 'style="invis"' attribute makes the edges non-visible
-        # sg.add_edge(pydot.Edge(pydot.Node(str(a)), pydot.Node(str(fam)), style="invis"))
-        # sg.add_edge(pydot.Edge(pydot.Node(str(fam)), pydot.Node(str(b)), style="invis"))
         P.add_subgraph(sg)
 
     # Render
