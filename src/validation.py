@@ -55,14 +55,14 @@ def validate_graph(G: nx.DiGraph) -> list[str]:
                     child_year = int(child_birth[:4])
                     if child_year - parent_year < 12:
                         warnings.append(
-                            f"Suspicious: {parent_data.get('person_name')} was less than 12 years old "
-                            f"when {child_data.get('person_name')} was born"
+                            f"Suspicious: {parent_data.get('person_name')} was less than 12 years "
+                            f"old when {child_data.get('person_name')} was born"
                         )
                 except (ValueError, IndexError):
                     pass
 
     # Check death before birth
-    for node, data in G.nodes(data=True):
+    for _, data in G.nodes(data=True):
         birth = data.get("birth_date")
         death = data.get("death_date")
 

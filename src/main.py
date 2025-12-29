@@ -12,11 +12,11 @@ Family tree application entry point.
 
 from pathlib import Path
 
-from parsing import parse_gedcom, normalize_data
 from database import create_database, store_data
 from graph import build_graph, get_ego_subgraph
-from validation import validate_graph
+from parsing import normalize_data, parse_gedcom
 from plotting import plot_graph
+from validation import validate_graph
 
 
 def main():

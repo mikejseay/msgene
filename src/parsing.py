@@ -178,7 +178,8 @@ def parse_date_string(date_str: str | None) -> str | None:
         if month:
             return f"{year:04d}-{month:02d}-{day:02d}"
 
-    # Pattern 8: "April 17, 1850" or "SEPT. 17,1910" or "Oct.12,1929" (Month DD, YYYY - various spacing)
+    # Pattern 8: "April 17, 1850" or "SEPT. 17,1910" or "Oct.12,1929"
+    # (Month DD, YYYY - various spacing)
     match = re.match(r"^([A-Za-z]+)\.?\s*(\d{1,2}),?\s*(\d{4})$", s)
     if match:
         month_str = match.group(1).upper().rstrip(".")
@@ -319,7 +320,7 @@ def normalize_data(reader: GedcomReader) -> tuple[list[Person], list[Relationshi
         }
 
     # Build relationships from families
-    for fam_id, fam in families.items():
+    for fam in families.values():
         husb_id = fam["husb"]
         wife_id = fam["wife"]
         children = fam["children"]

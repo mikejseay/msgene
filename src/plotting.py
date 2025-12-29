@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-import pydot
 import networkx as nx
+import pydot
 
 from graph import build_union_layout_graph
 
@@ -121,8 +121,9 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
     else:
         # Save to temporary file and display
         import tempfile
-        import matplotlib.pyplot as plt
+
         import matplotlib.image as mpimg
+        import matplotlib.pyplot as plt
 
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             P.write_png(f.name)

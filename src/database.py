@@ -49,7 +49,7 @@ def store_data(conn: sqlite3.Connection, persons: list[Person], relationships: l
     # Insert persons
     cursor.executemany(
         """
-        INSERT OR REPLACE INTO person 
+        INSERT OR REPLACE INTO person
         (id, name, given_name, surname, sex, birth_date_string, birth_date, birth_place, death_date_string, death_date, death_place)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
