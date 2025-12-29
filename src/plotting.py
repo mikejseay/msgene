@@ -2,103 +2,133 @@
 
 from pathlib import Path
 
+import pydot
 import networkx as nx
-from networkx.drawing.nx_pydot import graphviz_layout
-import matplotlib.pyplot as plt
+
+from graph import build_union_layout_graph
 
 
 def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
     """
-    Plot the family tree using Graphviz hierarchical layout.
+    Plot the family tree using the union-node model and Graphviz hierarchical layout.
 
-    Parents appear above children (ancestors at top), spouses aligned horizontally.
+    Creates a proper genealogical chart where:
+    - Parents appear above children (ancestors at top)
+    - Spouses are aligned horizontally on the same rank
+    - Siblings align under their family node
+    - Family/union nodes connect spouse pairs to their children
+
+    Args:
+        G: NetworkX DiGraph with person nodes and PARENT_OF/SPOUSE_OF edges
+        output_path: Path to save the output image (PNG). If None, displays interactively.
     """
-    plt.figure(figsize=(20, 16))
+    # Build the union-node layout graph
+    H = build_union_layout_graph(G)
 
-    # Use Graphviz 'dot' for hierarchical tree layout
-    # rankdir=TB = top-to-bottom (ancestors at top)
-    pos = graphviz_layout(G, prog="dot")
+    # Create pydot graph with hierarchical settings
+    P = pydot.Dot(graph_type="digraph")
+    P.set_rankdir("TB")  # Top-to-bottom (ancestors at top)
+    P.set_splines("ortho")  # Orthogonal edges for cleaner tree look
+    P.set_nodesep("0.4")  # Horizontal spacing between nodes
+    P.set_ranksep("0.6")  # Vertical spacing between ranks
 
-    # Separate edges by type for different styling
-    parent_edges = [
-        (u, v)
-        for u, v, d in G.edges(data=True)
-        if d.get("relationship_type") == "PARENT_OF"
-    ]
-    spouse_edges = [
-        (u, v)
-        for u, v, d in G.edges(data=True)
-        if d.get("relationship_type") == "SPOUSE_OF"
-    ]
+    # Track spouse pairs for rank=same subgraphs
+    spouse_pairs: list[tuple] = []
 
-    # Color nodes by sex
-    node_colors = []
-    for node in G.nodes():
-        sex = G.nodes[node].get("sex")
-        if sex == "M":
-            node_colors.append("lightblue")
-        elif sex == "F":
-            node_colors.append("lightpink")
+    # Add nodes
+    for node, data in H.nodes(data=True):
+        node_type = data.get("node_type", "person")
+
+        if node_type == "family":
+            # Family nodes are small invisible points
+            P.add_node(
+                pydot.Node(
+                    str(node),
+                    shape="point",
+                    width="0.1",
+                    height="0.1",
+                    label="",
+                )
+            )
+            # Track spouse pairs for rank alignment
+            spouses = data.get("spouses", ())
+            if len(spouses) == 2:
+                spouse_pairs.append(spouses)
         else:
-            node_colors.append("lightgray")
+            # Person nodes
+            sex = data.get("sex")
+            person_name = data.get("person_name", "?")
 
-    # Create node labels (name)
-    labels = {}
-    for node in G.nodes():
-        labels[node] = G.nodes[node].get("person_name", "?")
+            # Color by sex
+            if sex == "M":
+                fillcolor = "lightblue"
+            elif sex == "F":
+                fillcolor = "lightpink"
+            else:
+                fillcolor = "lightgray"
 
-    # Draw nodes
-    nx.draw_networkx_nodes(
-        G,
-        pos,
-        node_color=node_colors,
-        node_size=800,
-        alpha=0.9,
-    )
+            P.add_node(
+                pydot.Node(
+                    str(node),
+                    label=person_name,
+                    shape="box",
+                    style="rounded,filled",
+                    fillcolor=fillcolor,
+                    fontsize="10",
+                )
+            )
 
-    # Draw node labels
-    nx.draw_networkx_labels(
-        G,
-        pos,
-        labels=labels,
-        font_size=8,
-        font_weight="bold",
-    )
+    # Add edges
+    for u, v, data in H.edges(data=True):
+        edge_type = data.get("edge_type", "")
 
-    # Draw parent-child edges (solid arrows pointing down to children)
-    nx.draw_networkx_edges(
-        G,
-        pos,
-        edgelist=parent_edges,
-        edge_color="darkgray",
-        arrows=True,
-        arrowsize=15,
-        width=1.5,
-        alpha=0.8,
-    )
+        if edge_type == "spouse_to_family":
+            # Spouse to family node: no arrow, constraint to keep hierarchy
+            P.add_edge(
+                pydot.Edge(
+                    str(u),
+                    str(v),
+                    dir="none",
+                    color="darkgray",
+                )
+            )
+        elif edge_type == "family_to_child":
+            # Family node to child: arrow pointing down
+            P.add_edge(
+                pydot.Edge(
+                    str(u),
+                    str(v),
+                    color="darkgray",
+                )
+            )
 
-    # Draw spouse edges (dashed red lines, no arrows)
-    nx.draw_networkx_edges(
-        G,
-        pos,
-        edgelist=spouse_edges,
-        edge_color="red",
-        style="dashed",
-        arrows=False,
-        width=1.5,
-        alpha=0.6,
-    )
+    # Add rank=same subgraphs to align spouse pairs horizontally
+    for i, (a, b) in enumerate(spouse_pairs):
+        sg = pydot.Subgraph(f"cluster_couple_{i}", rank="same")
+        sg.add_node(pydot.Node(str(a)))
+        sg.add_node(pydot.Node(str(b)))
+        P.add_subgraph(sg)
 
-    plt.title(
-        f"Family Tree ({G.number_of_nodes()} people, {G.number_of_edges()} relationships)",
-        fontsize=14,
-        fontweight="bold",
-    )
-    plt.axis("off")
-    plt.tight_layout()
-
+    # Render
     if output_path:
-        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        # Determine format from extension
+        ext = output_path.suffix.lower().lstrip(".")
+        if ext not in ("png", "svg", "pdf"):
+            ext = "png"
+
+        P.write(str(output_path), format=ext)
         print(f"Graph saved to {output_path}")
     else:
-        plt.show()
+        # Save to temporary file and display
+        import tempfile
+        import matplotlib.pyplot as plt
+        import matplotlib.image as mpimg
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            P.write_png(f.name)
+            img = mpimg.imread(f.name)
+            plt.figure(figsize=(20, 16))
+            plt.imshow(img)
+            plt.axis("off")
+            plt.tight_layout()
+            plt.show()
