@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "ged4py>=0.5.2",
     "gramps>=6.0.6",
+    "graphviz>=0.21",
     "matplotlib>=3.10.8",
     "networkx>=3.6.1",
     "pydot>=4.0.1",
