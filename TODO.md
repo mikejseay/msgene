@@ -1,1 +1,2 @@
 - The current approach has a `main.py` that's at about 500 lines. Let's break up the functions into modules in an intelligent way and import them into the main script.
+- Currently the plot places nodes in seemingly random positions. Can we try to place them in a more logical way so that the family tree structure is respected?
