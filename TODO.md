@@ -1,5 +1,5 @@
 - The current approach has a `main.py` that's at about 500 lines. Let's break up the functions into modules in an intelligent way and import them into the main script.
-- In the `person` table, the "id" field is currently string type with examples like "@I_347421849@" or "I674624289" or "@I12785263082@". We should extract the numerical part only and have the "id" field be an integer type.
+- Running `main.py` should perform an "overwrite" on "family_tree.db" by default. That is, if it already exists, delete it and replace it.
 - In the `person` table, the "birth_date" and "death_date" fields are currently string type and have an unpredictable format. We should rename these as "birth_date_string" and "death_date_string", then try to convert the string to a true date format as best as possible. The date format result (if available) should be stored in new fields called "birth_date" and "death_date". If a string can't be parsed, leave it as null in these new date format fields. Here are some examples of date strings you can expect:
     - "25 NOV 1954"
     - "1698"
