@@ -57,7 +57,17 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
         else:
             # Person nodes
             sex = data.get("sex")
-            person_name = data.get("person_name", "?")
+            given_name = data.get("given_name", "")
+            surname = data.get("surname", "")
+            birth_date = data.get("birth_date", "")
+            death_date = data.get("death_date", "")
+
+            # Extract years from dates (assume format like "YYYY-MM-DD" or just "YYYY")
+            birth_year = birth_date[:4] if birth_date else ""
+            death_year = death_date[:4] if death_date else ""
+
+            # Build label
+            label = f"{given_name}\n{surname}\n{birth_year}-{death_year}"
 
             # Color by sex
             if sex == "M":
@@ -70,7 +80,7 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
             P.add_node(
                 pydot.Node(
                     str(node),
-                    label=person_name,
+                    label=label,
                     shape="box",
                     style="rounded,filled",
                     fillcolor=fillcolor,
@@ -104,7 +114,7 @@ def plot_graph(G: nx.DiGraph, output_path: Path | None = None):
 
     # Add rank=same subgraphs to align spouse pairs and family nodes horizontally
     for i, (a, b, _) in enumerate(spouse_pairs):
-        sg = pydot.Subgraph(f"cluster_couple_{i}", rank="same")
+        sg = pydot.Subgraph(f"couple_{i}", rank="same")
         sg.add_node(pydot.Node(str(a)))
         sg.add_node(pydot.Node(str(b)))
         P.add_subgraph(sg)
