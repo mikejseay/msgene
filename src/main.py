@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 
 @dataclass
 class Person:
-    id: str
+    id: int
     name: str
     given_name: str | None
     surname: str | None
@@ -39,14 +39,23 @@ class Person:
 
 @dataclass
 class Relationship:
-    person1_id: str
-    person2_id: str
+    person1_id: int
+    person2_id: int
     relationship_type: str  # PARENT_OF, CHILD_OF, SPOUSE_OF
 
 
 # ============================================================================
 # 1) Parse GEDCOM
 # ============================================================================
+
+
+def extract_numeric_id(xref_id: str) -> int:
+    """Extract numeric part from GEDCOM xref_id like '@I_347421849@' or 'I674624289'."""
+    # Remove @ symbols and extract all digits
+    digits = re.sub(r"[^0-9]", "", xref_id)
+    if not digits:
+        raise ValueError(f"No numeric ID found in: {xref_id}")
+    return int(digits)
 
 
 def parse_gedcom(filepath: Path) -> GedcomReader:
@@ -128,7 +137,10 @@ def normalize_data(reader: GedcomReader) -> tuple[list[Person], list[Relationshi
 
     # First pass: extract all individuals
     for rec in reader.records0("INDI"):
-        indi_id = rec.xref_id
+        if rec.xref_id is None:
+            continue
+
+        indi_id = extract_numeric_id(rec.xref_id)
         full_name, given_name, surname = extract_name_parts(rec)
         sex = extract_sex(rec)
         birth_date, birth_place = extract_event_details(rec, "BIRT")
@@ -152,16 +164,19 @@ def normalize_data(reader: GedcomReader) -> tuple[list[Person], list[Relationshi
     for rec in reader.records0("FAM"):
         fam_id = rec.xref_id
 
+        if fam_id is None:
+            continue
+
         husb = rec.sub_tag("HUSB")
         wife = rec.sub_tag("WIFE")
 
-        husb_id = husb.xref_id if husb else None
-        wife_id = wife.xref_id if wife else None
+        husb_id = extract_numeric_id(husb.xref_id) if husb and husb.xref_id else None
+        wife_id = extract_numeric_id(wife.xref_id) if wife and wife.xref_id else None
 
         child_ids = []
         for child in rec.sub_tags("CHIL"):
             if child.xref_id:
-                child_ids.append(child.xref_id)
+                child_ids.append(extract_numeric_id(child.xref_id))
 
         families[fam_id] = {
             "husb": husb_id,
@@ -219,7 +234,7 @@ def create_database(db_path: Path) -> sqlite3.Connection:
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS person (
-            id TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
             given_name TEXT,
             surname TEXT,
@@ -234,8 +249,8 @@ def create_database(db_path: Path) -> sqlite3.Connection:
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS relationship (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            person1_id TEXT NOT NULL,
-            person2_id TEXT NOT NULL,
+            person1_id INTEGER NOT NULL,
+            person2_id INTEGER NOT NULL,
             relationship_type TEXT NOT NULL,
             FOREIGN KEY (person1_id) REFERENCES person(id),
             FOREIGN KEY (person2_id) REFERENCES person(id)

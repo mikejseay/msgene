@@ -1,5 +1,7 @@
 Python tools for working with genealogy / family trees.
 
+We use `uv` for dependency management and `numpy` style docstrings.
+
 ## Common file formats / serializations
 
 ### 1) **GEDCOM** (`.ged`)
